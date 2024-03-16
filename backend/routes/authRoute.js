@@ -1,0 +1,75 @@
+const express = require("express");
+const router = express.Router();
+const User = require("../models/user");
+const { hashPassword, comparePassword } = require("../helper/auth");
+const jwt = require("jsonwebtoken");
+
+//REGISTER
+router.post("/register", async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!name) {
+      return res.json({ error: "Name is required" });
+    }
+    if (!password || password.length < 6) {
+      return res.json({
+        error: "Password is required and should be atleast 6 characters long",
+      });
+    }
+    const exist = await User.findOne({ email });
+    if (exist) {
+      return res.json({ error: "Email is taken already" });
+    }
+    const hashedPassword = await hashPassword(password);
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+    });
+    return res.status(200).json(user);
+  } catch (err) {
+    console.log(err);
+  }
+});
+
+//LOGIN
+router.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.json({ error: "No User found" });
+    }
+    const match = await comparePassword(password, user.password);
+    if (match) {
+      jwt.sign(
+        { email: user.email, id: user._id },
+        processs.env.JWT_SECRET,
+        {},
+        (err, token) => {
+          res.cookie("token", token).json(user);
+          console.log(err);
+        }
+      );
+      res.json("Password match");
+    } else {
+      res.json({ error: " Incorrect Password" });
+    }
+  } catch (err) {
+    console.log(err);
+  }
+});
+
+router.get("/profile", async (req, res) => {
+  const { token } = req.cookies;
+  if (token) {
+    jwt.verify(token, process.env.JWT_SECRET, {}, (err, user) => {
+      if (err) throw err;
+      res.json(user);
+    });
+  } else {
+    res.json(null);
+  }
+});
+
+module.exports = router;
